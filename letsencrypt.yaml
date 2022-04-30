@@ -1,0 +1,48 @@
+---
+  - name: "Let's Encrypt"
+    hosts:
+      - letsencrypt
+    gather_facts: yes
+    serial: 1
+    vars:
+      acme_cert_home: /etc/letsencrypt/certs
+      acme_config_home: /etc/letsencrypt/config
+      acme_dns_plugin: dns_gandi_livedns
+      acme_server: letsencrypt
+    environment:
+      GANDI_LIVEDNS_KEY: put_your_key_here
+    tasks:
+      - name: "Install git"
+        ansible.builtin.package:
+          name: git
+          state: present
+      - name: "Clone git repository acme.sh"
+        git: 
+          repo: https://github.com/acmesh-official/acme.sh.git
+          dest: /opt/acme
+          clone: yes
+          update: yes
+      - name: "Create directories"
+        file:
+          path: "/etc/letsencrypt"
+          state: directory
+          owner: root
+          mode: u=rwx,g=rx,o=rx
+        with_items:
+          certs
+          config
+      - name: "Generate Let's Encrypt certificate"
+        command: |
+          /opt/acme/acme.sh --issue --server {{ acme_server }} --cert-home {{ acme_cert_home }} --config-home {{ acme_config_home }} --dns {{ acme_dns_plugin }} --domain {{ inventory_hostname }}
+        ignore_errors: yes
+      - name: "Reload NGINX"
+        ansible.builtin.service:
+          name: nginx
+          state: reloaded
+        ignore_errors: yes
+      - name: "Reload Apache"
+        ansible.builtin.service:
+          name: apache24
+          state: reloaded
+        ignore_errors: yes
+

@@ -38,20 +38,30 @@
       - name: "Generate Let's Encrypt certificate"
         command: |
           /opt/acme/acme.sh --issue --server {{ acme_server }} --cert-home {{ letsencrypt_cert_dir }} --config-home {{ letsencrypt_config_dir }} --dns {{ acme_dns_plugin }} --domain {{ inventory_hostname }}
+        register: generate_cert
         ignore_errors: yes
+      # Setting the var 'fix_key_permission' to 'yes' causes the key file to become world readable
       - name: "Fix key permissions"
         file:
           path: "{{ letsencrypt_cert_dir }}/{{ inventory_hostname }}/{{ inventory_hostname }}.key"
           mode: u=rw,g=r,o=r
-        when: change_key_permission == 'yes'
-      - name: "Reload NGINX"
-        ansible.builtin.service:
-          name: nginx
-          state: reloaded
-        when: nginx == 'yes'
-      - name: "Reload Apache"
-        ansible.builtin.service:
-          name: apache24
-          state: reloaded
-        when: apache == 'yes'
-
+        when: 
+          - change_key_permission is defined
+          - change_key_permission == 'yes'
+      # Handles the restart/reloading of services. More than one service can be defined by using comma seperated values.
+      # reload_service=service1,service2
+      # restart_service=service1,service2
+      - name: "Reload services"
+        command: |
+          service {{ item }} reload
+        with_items: "{{ reload_service.split(',') }}"
+        when:
+          - reload_service is defined
+          - generate_cert['failed'] == false
+      - name: "Restart services"
+        command: |
+          service {{ item }} restart
+        with_items: "{{ restart_service.split(',') }}"
+        when:
+          - restart_service is defined
+          - generate_cert['failed'] == false

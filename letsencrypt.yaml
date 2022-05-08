@@ -35,15 +35,17 @@
         with_items:
           certs
           config
+      # Generate the certificate using the var 'domain'
       - name: "Generate Let's Encrypt certificate"
         command: |
-          /opt/acme/acme.sh --issue --server {{ acme_server }} --cert-home {{ letsencrypt_cert_dir }} --config-home {{ letsencrypt_config_dir }} --dns {{ acme_dns_plugin }} --domain {{ inventory_hostname }}
+          /opt/acme/acme.sh --issue --server {{ acme_server }} --cert-home {{ letsencrypt_cert_dir }} --config-home {{ letsencrypt_config_dir }} --dns {{ acme_dns_plugin }} --domain {{ domain }}
         register: generate_cert
+        when: domain is defined
         ignore_errors: yes
       # Setting the var 'fix_key_permission' to 'yes' causes the key file to become world readable
       - name: "Fix key permissions"
         file:
-          path: "{{ letsencrypt_cert_dir }}/{{ inventory_hostname }}/{{ inventory_hostname }}.key"
+          path: "{{ letsencrypt_cert_dir }}/{{ domain }}/{{ domain }}.key"
           mode: u=rw,g=r,o=r
         when: 
           - change_key_permission is defined
